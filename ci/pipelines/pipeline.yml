@@ -1,0 +1,127 @@
+
+ccp_options_anchor: &ccp_options
+  terraform_source: ccp_src/aws/
+  vars:
+    aws_instance-node-instance_type: t2.medium
+
+ccp_destroy_anchor: &ccp_destroy
+  put: terraform
+  params:
+    action: destroy
+    env_name_file: terraform/name
+    <<: *ccp_options
+  get_params:
+    action: destroy
+
+resource_types:
+- name: terraform
+  type: docker-image
+  source:
+    repository: ljfranklin/terraform-resource
+
+resources:
+
+- name: madlib_src
+  type: git
+  source:
+    branch: {{madlib-git-branch-release}}
+    uri: {{madlib-git-ok-remote}}
+- name: madlib_ci
+  type: git
+  source:
+    branch: {{madlib-ci-git-branch}}
+    uri: {{madlib-ci-git-remote}}
+    private_key: {{madlib-ci-git-key}}
+
+- name: ccp_src
+  type: git
+  source:
+    branch: {{ccp-git-branch}}
+    private_key: {{ccp-git-key}}
+    uri: {{ccp-git-remote}}
+    tag_filter: {{ccp-tag-filter}}
+
+- name: gpdb_src
+  type: git
+  source:
+    branch: {{gpdb-git-branch}}
+    uri: {{gpdb-git-remote}}
+    ignore_paths:
+    - gpdb-doc/*
+    - README*
+
+- name: gpdb_binary
+  type: s3
+  source:
+    access_key_id: {{bucket-access-key-id}}
+    bucket: {{bucket-name}}
+    region_name: {{aws-region}}
+    secret_access_key: {{bucket-secret-access-key}}
+    versioned_file: bin_gpdb_centos/bin_gpdb.tar.gz
+
+- name: terraform
+  type: terraform
+  source:
+    env:
+      AWS_ACCESS_KEY_ID: {{tf-machine-access-key-id}}
+      AWS_SECRET_ACCESS_KEY: {{tf-machine-secret-access-key}}
+    storage:
+      access_key_id: {{tf-machine-access-key-id}}
+      secret_access_key: {{tf-machine-secret-access-key}}
+      region_name: {{aws-region}}
+      # This is not parameterized, on purpose. All tfstates will go to this spot,
+      # and different teams will place there clusters' tfstate files under different paths
+      bucket: gpdb5-pipeline-dynamic-terraform
+      ###########################################################
+      # Two conventions are allowed for bucket_path:            #
+      # 1) Cluster are expected to be destroyed automatically   #
+      #    Toolsmiths will reap old and orphaned clusters       #
+      #                                                         #
+      #      bucket_path: prod/[Pipeline Name]/                 #
+      #                                                         #
+      # 2) Long lived clusters for development.                 #
+      #    The team that creates it is responsible for cluster  #
+      #                                                         #
+      #     bucket_path: dev/[Team Name]/                       #
+      #                                                         #
+      ###########################################################
+      bucket_path: dev/cs/
+
+jobs:
+- name: example_end_to_end_job
+  max_in_flight: 1
+  plan:
+  - aggregate:
+    - get: check-gpdb_src
+    - get: ccp_src
+      trigger: true
+    - get: gpdb_binary
+    - get: gpdb_src
+  - put: terraform
+    params:
+      action: create
+      delete_on_failure: true
+      generate_random_name: true
+      <<: *ccp_options
+  - task: gen_cluster
+    file: ccp_src/examples/tasks/ccp_gen_cluster_example.yml
+    on_failure:
+      <<: *ccp_destroy
+  - task: run_noop
+    config:
+      platform: linux
+      image_resource:
+        type: docker-image
+        source:
+          repository: alpine
+          tag: latest
+      run:
+        path: 'sh'
+        args: ['-c', 'sleep 10']
+    on_failure:
+      <<: *ccp_destroy
+  - task: check-gpdb
+    file: check-gpdb/ci/tasks/check-gpdb.yml
+    on_failure:
+      <<: *ccp_destroy
+  - *ccp_destroy
