@@ -20,7 +20,7 @@ run_check-gpdb_test() {
         export MASTER_DATA_DIRECTORY=/data/master/gpseg-1; \
         createdb ${PGDATABASE}; \
         # Run check-gpdb test
-        cd /home/gpadmin/check-gpdb/src/tests/; \
+        cd /home/gpadmin/check-gpdb_src/src/tests/; \
         ./check-gpdb.sh; \
     \""
 }

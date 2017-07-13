@@ -12,4 +12,4 @@ inputs:
 - name: check-gpdb_src
 
 run:
-  path: check-gpdb/ci/scripts/check-gpdb.sh
+  path: check-gpdb_src/ci/scripts/check-gpdb.sh

@@ -115,7 +115,7 @@ jobs:
     on_failure:
       <<: *ccp_destroy
   - task: check-gpdb
-    file: check-gpdb/ci/tasks/check-gpdb.yml
+    file: check-gpdb_src/ci/tasks/check-gpdb.yml
     on_failure:
       <<: *ccp_destroy
   - *ccp_destroy
