@@ -21,17 +21,11 @@ resource_types:
 
 resources:
 
-- name: madlib_src
+- name: check-gpdb_src
   type: git
   source:
-    branch: {{madlib-git-branch-release}}
-    uri: {{madlib-git-ok-remote}}
-- name: madlib_ci
-  type: git
-  source:
-    branch: {{madlib-ci-git-branch}}
-    uri: {{madlib-ci-git-remote}}
-    private_key: {{madlib-ci-git-key}}
+    branch: master
+    uri: https://github.com/orhankislal/check-gpdb.git
 
 - name: ccp_src
   type: git
